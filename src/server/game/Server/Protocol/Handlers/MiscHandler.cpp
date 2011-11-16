@@ -950,7 +950,7 @@ void WorldSession::HandleUpdateAccountData(WorldPacket &recv_data)
 
     ByteBuffer dest(decompressedSize);
     uLongf realSize = decompressedSize;
-    if (uncompress(reinterpret_cast<uint8*>(dest.contents()), &realSize, reinterpret_cast<uint8*>(recv_data.contents() + recv_data.ReadPos()), recv_data.size() - recv_data.ReadPos()) != Z_OK)
+    if (uncompress(reinterpret_cast<uint8*>(dest.contents()), &realSize, reinterpret_cast<uint8*>(recv_data.contents()) + recv_data.ReadPos(), recv_data.size() - recv_data.ReadPos()) != Z_OK)
     {
         recv_data.rfinish();                   // unnneded warning spam in this case
         sLog->outError("UAD: Failed to decompress account data");
