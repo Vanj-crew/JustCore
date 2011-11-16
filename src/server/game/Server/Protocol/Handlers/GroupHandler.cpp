@@ -925,7 +925,7 @@ void WorldSession::HandleRequestPartyMemberStatsOpcode(WorldPacket &recv_data)
     data << (uint16) player->GetPositionY();                // GROUP_UPDATE_FLAG_POSITION
 
     uint64 auramask = 0;
-    size_t maskPos = data.wpos();
+    size_t maskPos = data.WritePos();
     data << (uint64) auramask;                              // placeholder
     for (uint8 i = 0; i < MAX_AURAS; ++i)
     {
@@ -951,7 +951,7 @@ void WorldSession::HandleRequestPartyMemberStatsOpcode(WorldPacket &recv_data)
         data << (uint16) pet->GetMaxPower(petpowertype);    // GROUP_UPDATE_FLAG_PET_MAX_POWER
 
         uint64 petauramask = 0;
-        size_t petMaskPos = data.wpos();
+        size_t petMaskPos = data.WritePos();
         data << (uint64) petauramask;                       // placeholder
         for (uint8 i = 0; i < MAX_AURAS; ++i)
         {

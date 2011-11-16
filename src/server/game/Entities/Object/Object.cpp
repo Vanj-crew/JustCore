@@ -144,7 +144,7 @@ void Object::_Create(uint32 guidlow, uint32 entry, HighGuid guidhigh)
         type = m_objectType;
 
     SetUInt32Value(OBJECT_FIELD_TYPE, type);
-    m_PackGUID.wpos(0);
+    m_PackGUID.clear();
     m_PackGUID.appendPackGUID(GetGUID());
 }
 

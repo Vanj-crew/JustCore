@@ -146,7 +146,7 @@ char const *WorldSession::GetPlayerName() const
 }
 
 /// Send a packet to the client
-void WorldSession::SendPacket(WorldPacket const *packet)
+void WorldSession::SendPacket(WorldPacket* packet)
 {
     if (!m_Socket)
         return;
@@ -189,7 +189,7 @@ void WorldSession::SendPacket(WorldPacket const *packet)
 
         lastTime = cur_time;
         sendLastPacketCount = 1;
-        sendLastPacketBytes = packet->wpos();               // wpos is real written size
+        sendLastPacketBytes = packet->WritePos();               // WritePos is real written size
     }
 #endif                                                      // !TRILLIUMEMU_DEBUG
 
@@ -215,7 +215,7 @@ void WorldSession::LogUnexpectedOpcode(WorldPacket* packet, const char* status, 
 void WorldSession::LogUnprocessedTail(WorldPacket* packet)
 {
     sLog->outError("SESSION: opcode %s (0x%.4X) have unprocessed tail data (read stop at %u from %u)",
-        LookupOpcodeName(packet->GetOpcode()), packet->GetOpcode(), uint32(packet->rpos()), uint32(packet->wpos()));
+        LookupOpcodeName(packet->GetOpcode()), packet->GetOpcode(), uint32(packet->ReadPos()), uint32(packet->WritePos()));
     packet->print_storage();
 }
 
@@ -252,7 +252,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                     {
                         sScriptMgr->OnPacketReceive(m_Socket, WorldPacket(*packet));
                         (this->*opHandle->handler)(*packet);
-                        if (sLog->IsOutDebug() && packet->rpos() < packet->wpos())
+                        if (sLog->IsOutDebug() && packet->ReadPos() < packet->WritePos())
                             LogUnprocessedTail(packet);
                     }
                     // lag can cause STATUS_LOGGEDIN opcodes to arrive after the player started a transfer
@@ -266,7 +266,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         // not expected _player or must checked in packet handler
                         sScriptMgr->OnPacketReceive(m_Socket, WorldPacket(*packet));
                         (this->*opHandle->handler)(*packet);
-                        if (sLog->IsOutDebug() && packet->rpos() < packet->wpos())
+                        if (sLog->IsOutDebug() && packet->ReadPos() < packet->WritePos())
                             LogUnprocessedTail(packet);
                     }
                     break;
@@ -279,7 +279,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                     {
                         sScriptMgr->OnPacketReceive(m_Socket, WorldPacket(*packet));
                         (this->*opHandle->handler)(*packet);
-                        if (sLog->IsOutDebug() && packet->rpos() < packet->wpos())
+                        if (sLog->IsOutDebug() && packet->ReadPos() < packet->WritePos())
                             LogUnprocessedTail(packet);
                     }
                     break;
@@ -298,7 +298,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
                     sScriptMgr->OnPacketReceive(m_Socket, WorldPacket(*packet));
                     (this->*opHandle->handler)(*packet);
-                    if (sLog->IsOutDebug() && packet->rpos() < packet->wpos())
+                    if (sLog->IsOutDebug() && packet->ReadPos() < packet->WritePos())
                         LogUnprocessedTail(packet);
                     break;
                 case STATUS_NEVER:
@@ -730,7 +730,7 @@ void WorldSession::SaveTutorialsData(SQLTransaction &trans)
 
 void WorldSession::ReadAddonsInfo(WorldPacket &data)
 {
-    if (data.rpos() + 4 > data.size())
+    if (data.ReadPos() + 4 > data.size())
         return;
     uint32 size;
     data >> size;
@@ -746,12 +746,11 @@ void WorldSession::ReadAddonsInfo(WorldPacket &data)
 
     uLongf uSize = size;
 
-    uint32 pos = data.rpos();
+    uint32 pos = data.ReadPos();
 
-    ByteBuffer addonInfo;
-    addonInfo.resize(size);
+    ByteBuffer addonInfo(size);
 
-    if (uncompress(const_cast<uint8 *>(addonInfo.contents()), &uSize, const_cast<uint8 *>(data.contents() + pos), data.size() - pos) == Z_OK)
+    if (uncompress((Bytef*)addonInfo.contents(), &uSize, (Bytef*)data.contents() + pos, data.size() - pos) == Z_OK)
     {
         uint32 addonsCount;
         addonInfo >> addonsCount;                         // addons count
@@ -763,7 +762,7 @@ void WorldSession::ReadAddonsInfo(WorldPacket &data)
             uint32 crc, unk1;
 
             // check next addon data format correctness
-            if (addonInfo.rpos() + 1 > addonInfo.size())
+            if (addonInfo.ReadPos() + 1 > addonInfo.size())
                 return;
 
             addonInfo >> addonName;
@@ -802,7 +801,7 @@ void WorldSession::ReadAddonsInfo(WorldPacket &data)
         addonInfo >> currentTime;
         sLog->outDebug(LOG_FILTER_NETWORKIO, "ADDON: CurrentTime: %u", currentTime);
 
-        if (addonInfo.rpos() != addonInfo.size())
+        if (addonInfo.ReadPos() != addonInfo.size())
             sLog->outDebug(LOG_FILTER_NETWORKIO, "packet under-read!");
     }
     else

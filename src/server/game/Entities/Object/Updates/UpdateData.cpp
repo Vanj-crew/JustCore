@@ -51,7 +51,7 @@ bool UpdateData::BuildPacket(WorldPacket* packet)
 {
     ASSERT(packet->empty());                                // shouldn't happen
 
-    packet->Initialize(SMSG_UPDATE_OBJECT, 2 + 4 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.wpos());
+    packet->Initialize(SMSG_UPDATE_OBJECT, 2 + 4 + (m_outOfRangeGUIDs.empty() ? 0 : 1 + 4 + 9 * m_outOfRangeGUIDs.size()) + m_data.WritePos());
 
     *packet << uint16(m_map);
     *packet << uint32(!m_outOfRangeGUIDs.empty() ? m_blockCount + 1 : m_blockCount);
@@ -67,7 +67,7 @@ bool UpdateData::BuildPacket(WorldPacket* packet)
 
     packet->append(m_data);
 
-    if (packet->wpos() > 100)
+    if (packet->WritePos() > 100)
         packet->compress(SMSG_COMPRESSED_UPDATE_OBJECT);
 
     return true;

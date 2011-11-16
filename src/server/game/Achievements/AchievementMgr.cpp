@@ -2130,7 +2130,7 @@ void AchievementMgr::SendAllAchievementData() const
     for (CriteriaProgressMap::const_iterator iter = m_criteriaProgress.begin(); iter!=m_criteriaProgress.end(); ++iter)
         data << uint32(iter->first);
 
-    if (data.wpos() > 100)
+    if (data.WritePos() > 100)
         data.compress(SMSG_COMPRESSED_ACHIEVEMENT_DATA);
 
     GetPlayer()->GetSession()->SendPacket(&data);
@@ -2173,7 +2173,7 @@ void AchievementMgr::SendRespondInspectAchievements(Player* player) const
     for (CompletedAchievementMap::const_iterator iter = m_completedAchievements.begin(); iter!=m_completedAchievements.end(); ++iter)
         data << uint32(secsToTimeBitFields(iter->second.date));
 
-    if (data.wpos() > 100)
+    if (data.WritePos() > 100)
         data.compress(SMSG_COMPRESSED_RESPOND_INSPECT_ACHIEVEMENTS);
 
     player->GetSession()->SendPacket(&data);

@@ -327,7 +327,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << uint32(0x919BE54E);                        // Random uint32 4.0.1
         data << pProto->ItemId;
 
-        size_t pos = data.wpos();
+        size_t pos = data.WritePos();
         data << uint32(bytecount);
         data << pProto->ItemId;
         data << pProto->Quality;
@@ -439,7 +439,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << uint32(0);                                  // 4.0.0
         data << uint32(0);                                  // 4.0.0
 
-        data.put<uint32>(pos, data.wpos()-16);
+        data.put<uint32>(pos, data.WritePos()-16);
 
         SendPacket(&data);
     }
@@ -804,7 +804,7 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
     data << uint32(vendorGuid);
     data << uint8(0);
 
-    size_t countPos = data.wpos();
+    size_t countPos = data.WritePos();
     data << uint32(count);
     data << uint8((count % 10) == 0 ? count / 10 : (count / 10) + 1);
     data << uint8(0);

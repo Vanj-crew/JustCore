@@ -720,7 +720,7 @@ void WorldSession::HandleCharCreateCallback(PreparedQueryResult result, Characte
                 return;
             }
 
-            if (createInfo->Data.rpos() < createInfo->Data.wpos())
+            if (createInfo->Data.ReadPos() < createInfo->Data.WritePos())
                 sLog->outDebug(LOG_FILTER_NETWORKIO, "Character creation %s (account %u) has unhandled tail data", createInfo->Name.c_str(), GetAccountId());
 
             Player newChar(this);

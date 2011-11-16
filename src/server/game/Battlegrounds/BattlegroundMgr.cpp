@@ -321,7 +321,7 @@ void BattlegroundMgr::BuildPvpLogDataPacket(WorldPacket *data, Battleground *bg)
         }
     }
 
-    size_t wpos = data->wpos();
+    size_t WritePos = data->WritePos();
     uint32 scoreCount = 0;
     *data << uint32(scoreCount);                            // placeholder
     if (int8(type * 4) < 0)  // when battle is over
@@ -380,7 +380,7 @@ void BattlegroundMgr::BuildPvpLogDataPacket(WorldPacket *data, Battleground *bg)
         }
         *data << uint32(itr2->second->DamageDone);              // damage done
         *data << uint32(0);//unk, enabled by flag
-        size_t extraFields = data->wpos();
+        size_t extraFields = data->WritePos();
         *data << uint32(0); // count of extra fields
         // next 3 fields enabled by flag
         *data << uint32(itr2->second->HonorableKills);
@@ -492,7 +492,7 @@ void BattlegroundMgr::BuildPvpLogDataPacket(WorldPacket *data, Battleground *bg)
         }
     }
 
-    data->put(wpos, scoreCount);
+    data->put(WritePos, scoreCount);
 }
 
 void BattlegroundMgr::BuildGroupJoinedBattlegroundPacket(WorldPacket *data, GroupJoinBattlegroundResult result)
@@ -901,7 +901,7 @@ void BattlegroundMgr::BuildBattlegroundListPacket(WorldPacket *data, uint64 guid
     winner_kills = Trillium::Honor::hk_honor_at_level(player->getLevel(), float(winner_kills));
     loser_kills = Trillium::Honor::hk_honor_at_level(player->getLevel(), float(loser_kills));
 
-    data->Initialize(SMSG_BATTLEFIELD_LIST);
+    data->Initialize(SMSG_BATTLEFIELD_LIST, 50);
     *data << uint64(guid);                                  // battlemaster guid
     *data << uint32(bgTypeId);                              // battleground id
     *data << uint8(0);                                      // unk
@@ -931,7 +931,7 @@ void BattlegroundMgr::BuildBattlegroundListPacket(WorldPacket *data, uint64 guid
     }
     else                                                    // battleground
     {
-        size_t count_pos = data->wpos();
+        size_t count_pos = data->WritePos();
         *data << uint32(0);                                 // number of bg instances
 
         if (Battleground* bgTemplate = sBattlegroundMgr->GetBattlegroundTemplate(bgTypeId))

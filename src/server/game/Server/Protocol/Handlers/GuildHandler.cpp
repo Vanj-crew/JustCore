@@ -266,14 +266,14 @@ void WorldSession::HandleGuildRankOpcode(WorldPacket& recvPacket)
     if (GetPlayer()->GetGUID() != playerGuid)
     {
         sLog->outString("CMSG_GUILD_RANK: The playerGUID in the packet does not match the current player!\n");
-        recvPacket.rpos(recvPacket.wpos());                 // set to end to avoid warnings spam
+        recvPacket.rfinish();                 // set to end to avoid warnings spam
         Guild::SendCommandResult(this, GUILD_CREATE_S, ERR_GUILD_PLAYER_NOT_IN_GUILD);
         return;
     }
     if (GetPlayer()->GetGuildId() != GUID_LOPART(guildId))
     {
         sLog->outString("CMSG_GUILD_RANK: This player is not in the guild.\n");
-        recvPacket.rpos(recvPacket.wpos());                 // set to end to avoid warnings spam
+        recvPacket.rfinish();                 // set to end to avoid warnings spam
         Guild::SendCommandResult(this, GUILD_CREATE_S, ERR_GUILD_PLAYER_NOT_IN_GUILD);
         return;
     }
@@ -281,7 +281,7 @@ void WorldSession::HandleGuildRankOpcode(WorldPacket& recvPacket)
     Guild* guild = _GetPlayerGuild(this, true);
     if (!guild)
     {
-        recvPacket.rpos(recvPacket.wpos());
+        recvPacket.rfinish();
         return;
     }
 

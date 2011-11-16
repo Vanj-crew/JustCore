@@ -815,7 +815,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
     //gold
     b << uint32(l.gold);
 
-    size_t count_pos = b.wpos();                            // pos of item count byte
+    size_t count_pos = b.WritePos();                            // pos of item count byte
     b << uint8(0);                                          // item count placeholder
     b << uint8(0);                                          // 4.0.6
 

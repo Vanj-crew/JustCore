@@ -111,7 +111,7 @@ class WorldSocket : public WorldHandler
         /// Send A packet on the socket, this function is reentrant.
         /// @param pct packet to send
         /// @return -1 of failure
-        int SendPacket (const WorldPacket& pct);
+        int SendPacket (WorldPacket& pct);
 
         /// Add reference to this object.
         long AddReference (void);

@@ -256,7 +256,7 @@ void PlayerMenu::SendQuestGiverQuestList(QEmote eEmote, const std::string& Title
     data << uint32(eEmote._Delay);                         // player emote
     data << uint32(eEmote._Emote);                         // NPC emote
 
-    size_t count_pos = data.wpos();
+    size_t count_pos = data.WritePos();
     data << uint8 (_questMenu.GetMenuItemCount());
     uint32 count = 0;
     for (; count < _questMenu.GetMenuItemCount(); ++count)

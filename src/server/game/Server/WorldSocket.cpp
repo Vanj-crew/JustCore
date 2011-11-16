@@ -155,12 +155,14 @@ const std::string& WorldSocket::GetRemoteAddress (void) const
     return m_Address;
 }
 
-int WorldSocket::SendPacket (const WorldPacket& pct)
+int WorldSocket::SendPacket(WorldPacket& pct)
 {
     ACE_GUARD_RETURN (LockType, Guard, m_OutBufferLock, -1);
 
     if (closing_)
         return -1;
+
+    pct.deAllocateLeftover();
 
     // Dump outgoing packet.
     _LogPacket(pct, true);
@@ -508,7 +510,6 @@ int WorldSocket::handle_input_header (void)
 
     if (header.size > 0)
     {
-        m_RecvWPct->resize (header.size);
         m_RecvPct.base ((char*) m_RecvWPct->contents(), m_RecvWPct->size());
     }
     else
@@ -789,8 +790,8 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     recvPacket >> account;
 
     recvPacket >> m_addonSize;                            // addon data size
-    size_t addonInfoPos = recvPacket.rpos();
-    recvPacket.rpos(recvPacket.rpos() + m_addonSize);     // skip it
+    size_t addonInfoPos = recvPacket.ReadPos();
+    recvPacket.rfinish();     // skip it
 
     if (sWorld->IsClosed())
     {
@@ -981,7 +982,6 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
 
     m_Session->LoadGlobalAccountData();
     m_Session->LoadTutorialsData();
-    recvPacket.rpos(addonInfoPos);
     m_Session->ReadAddonsInfo(recvPacket);
 
     // Sleep this Network thread for

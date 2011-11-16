@@ -948,18 +948,16 @@ void WorldSession::HandleUpdateAccountData(WorldPacket &recv_data)
         return;
     }
 
-    ByteBuffer dest;
-    dest.resize(decompressedSize);
-
+    ByteBuffer dest(decompressedSize);
     uLongf realSize = decompressedSize;
-    if (uncompress(const_cast<uint8*>(dest.contents()), &realSize, const_cast<uint8*>(recv_data.contents() + recv_data.rpos()), recv_data.size() - recv_data.rpos()) != Z_OK)
+    if (uncompress(reinterpret_cast<uint8*>(dest.contents()), &realSize, reinterpret_cast<uint8*>(recv_data.contents() + recv_data.ReadPos()), recv_data.size() - recv_data.ReadPos()) != Z_OK)
     {
-        recv_data.rfinish();                   // unneeded warning spam in this case
+        recv_data.rfinish();                   // unnneded warning spam in this case
         sLog->outError("UAD: Failed to decompress account data");
         return;
     }
 
-    recv_data.rfinish();                       // uncompress read (recv_data.size() - recv_data.rpos())
+    recv_data.rfinish();                       // uncompress read (recv_data.size() - recv_data.ReadPos())
 
     std::string adata;
     dest >> adata;
@@ -985,28 +983,22 @@ void WorldSession::HandleRequestAccountData(WorldPacket& recv_data)
         return;
 
     AccountData *adata = GetAccountData(AccountDataType(type));
-
     uint32 size = adata->Data.size();
-
     uLongf destSize = compressBound(size);
+    ByteBuffer dest(destSize);
 
-    ByteBuffer dest;
-    dest.resize(destSize);
-
-    if (size && compress(const_cast<uint8*>(dest.contents()), &destSize, (uint8*)adata->Data.c_str(), size) != Z_OK)
+    if (size && compress((Bytef*)dest.contents(), &destSize, (uint8*)adata->Data.c_str(), size) != Z_OK)
     {
         sLog->outDebug(LOG_FILTER_NETWORKIO, "RAD: Failed to compress account data");
         return;
     }
-
-    dest.resize(destSize);
 
     WorldPacket data(SMSG_UPDATE_ACCOUNT_DATA, 8+4+4+4+destSize);
     data << uint64(_player ? _player->GetGUID() : 0);       // player guid
     data << uint32(type);                                   // type (0-7)
     data << uint32(adata->Time);                            // unix time
     data << uint32(size);                                   // decompressed length
-    data.append(dest);                                      // compressed data
+    data.append(dest.contents(), dest.size());              // compressed data
     SendPacket(&data);
 }
 
@@ -1136,7 +1128,7 @@ void WorldSession::HandleInspectOpcode(WorldPacket& recv_data)
         return;
 
     uint32 talent_points = 0x29;
-    uint32 guid_size = player->GetPackGUID().wpos();
+    uint32 guid_size = player->GetPackGUID().WritePos();
     WorldPacket data(SMSG_INSPECT_TALENT, guid_size+4+talent_points);
     data.append(player->GetPackGUID());
 

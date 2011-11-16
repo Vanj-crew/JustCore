@@ -65,7 +65,7 @@ void WorldSession::HandleCalendarGetCalendar(WorldPacket & /*recv_data*/)
     data << uint32(secsToTimeBitFields(cur_time));          // current time
 
     uint32 counter = 0;
-    size_t p_counter = data.wpos();
+    size_t p_counter = data.WritePos();
     data << uint32(counter);                                // instance save count
 
     for (int i = 0; i < MAX_DIFFICULTY; ++i)
@@ -89,7 +89,7 @@ void WorldSession::HandleCalendarGetCalendar(WorldPacket & /*recv_data*/)
     data << uint32(1135753200);                             // unk (28.12.2005 12:00)
 
     counter = 0;
-    p_counter = data.wpos();
+    p_counter = data.WritePos();
     data << uint32(counter);                                // raid reset count
 
     ResetTimeByMapDifficultyMap const& resets = sInstanceSaveMgr->GetResetTimeMap();

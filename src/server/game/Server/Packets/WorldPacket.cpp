@@ -29,20 +29,21 @@ void WorldPacket::compress(Opcodes opcode)
         return;
 
     Opcodes uncompressedOpcode = GetOpcode();
-    uint32 size = wpos();
+    uint32 size = WritePos();
     uint32 destsize = compressBound(size);
 
-    std::vector<uint8> storage(destsize);
+    void *storage = malloc(destsize);
 
-    _compress(static_cast<void*>(&storage[0]), &destsize, static_cast<const void*>(contents()), size);
+    _compress(storage, &destsize, data, size);
+
     if (destsize == 0)
         return;
 
     clear();
-    reserve(destsize + sizeof(uint32));
     *this << uint32(size);
-    append(&storage[0], destsize);
+    append<void*>(storage, destsize);
     SetOpcode(opcode);
+    free(storage);
 
     sLog->outStaticDebug("Successfully compressed opcode %u (len %u) to %u (len %u)",
         uncompressedOpcode, size, opcode, destsize);

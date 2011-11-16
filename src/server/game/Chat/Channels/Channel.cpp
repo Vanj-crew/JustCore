@@ -557,7 +557,7 @@ void Channel::List(Player* player)
         data << GetName();                                  // channel name
         data << uint8(GetFlags());                          // channel flags?
 
-        size_t pos = data.wpos();
+        size_t pos = data.WritePos();
         data << uint32(0);                                  // size of list, placeholder
 
         uint32 gmLevelInWhoList = sWorld->getIntConfig(CONFIG_GM_LEVEL_IN_WHO_LIST);

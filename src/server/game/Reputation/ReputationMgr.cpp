@@ -173,7 +173,7 @@ void ReputationMgr::SendState(FactionState const* faction)
     data << (float) 0;                                  // unk 2.4.0
     data << (uint8) 0;                                  // wotlk 8634
 
-    size_t p_count = data.wpos();
+    size_t p_count = data.WritePos();
     data << (uint32) count;                             // placeholder
 
     data << (uint32) faction->ReputationListID;

@@ -126,7 +126,7 @@ void PlayerSocial::SendSocialList(Player* player, uint32 mask)
     uint32 count = 0;
 
     WorldPacket data(SMSG_CONTACT_LIST, 4 + 4);              // just can guess size
-    size_t countPos = data.wpos();
+    size_t countPos = data.WritePos();
     data << uint32(mask);                                    // unk flag (0x1, 0x2, 0x4), 0x7 if it include ignore list
     data << uint32(count);                                   // friends count
 

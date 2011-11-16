@@ -169,7 +169,7 @@ void WorldSession::SendTrainerList(uint64 guid, const std::string &strTitle)
     data << uint32(trainer_spells->trainerType);
     data << uint32(creatureInfo->trainer_id);             // Get TrainerID from creature_template.
 
-    size_t count_pos = data.wpos();
+    size_t count_pos = data.WritePos();
     data << uint32(trainer_spells->spellList.size());
 
     // reputation discount
@@ -471,7 +471,7 @@ void WorldSession::SendStablePetCallback(QueryResult result, uint64 guid)
 
     Pet *pet = _player->GetPet();
 
-    size_t wpos = data.wpos();
+    size_t WritePos = data.WritePos();
     data << uint8(0);                                       // place holder for slot show number
 
     data << uint8(20);
@@ -496,7 +496,7 @@ void WorldSession::SendStablePetCallback(QueryResult result, uint64 guid)
         while (result->NextRow());
     }
 
-    data.put<uint8>(wpos, num);                             // set real data to placeholder
+    data.put<uint8>(WritePos, num);                             // set real data to placeholder
     SendPacket(&data);
 }
 

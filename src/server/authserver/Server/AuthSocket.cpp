@@ -20,6 +20,7 @@
  */
 
 #include <openssl/md5.h>
+#include <openssl/crypto.h>
 
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
@@ -490,6 +491,7 @@ bool AuthSocket::_HandleLogonChallenge()
             pkt << (uint8)WOW_FAIL_UNKNOWN_ACCOUNT;
     }
 
+    pkt.deAllocateLeftover();
     socket().send((char const*)pkt.contents(), pkt.size());
     return true;
 }
@@ -888,10 +890,12 @@ bool AuthSocket::_HandleRealmList()
         RealmListSizeBuffer << (uint32)RealmListSize;
 
     ByteBuffer hdr;
-    hdr << (uint8) REALM_LIST;
-    hdr << (uint16)(pkt.size() + RealmListSizeBuffer.size());
-    hdr.append(RealmListSizeBuffer);                        // append RealmList's size buffer
-    hdr.append(pkt);                                        // append realms in the realmlist
+    hdr << uint8(REALM_LIST);
+    hdr << uint16(0);                   // size
+    hdr.append(RealmListSizeBuffer);    // append RealmList's size buffer
+    hdr.append(pkt);                    // append realms in the realmlist
+    hdr.deAllocateLeftover();
+    hdr.put<uint16>(1, pkt.size() + RealmListSizeBuffer.size());
 
     socket().send((char const*)hdr.contents(), hdr.size());
 

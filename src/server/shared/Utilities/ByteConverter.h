@@ -27,7 +27,7 @@
  */
 
 #include "Define.h"
-#include<algorithm>
+#include <algorithm>
 
 namespace ByteConverter
 {
@@ -54,9 +54,6 @@ template<typename T> inline void EndianConvertReverse(T&) { }
 template<typename T> inline void EndianConvert(T&) { }
 template<typename T> inline void EndianConvertReverse(T& val) { ByteConverter::apply<T>(&val); }
 #endif
-
-template<typename T> void EndianConvert(T*);         // will generate link error
-template<typename T> void EndianConvertReverse(T*);  // will generate link error
 
 inline void EndianConvert(uint8&) { }
 inline void EndianConvert( int8&) { }

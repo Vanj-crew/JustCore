@@ -415,7 +415,7 @@ void Guild::BankTab::WriteSlotPacket(WorldPacket& data, uint8 slotId) const
         data << uint8(abs(pItem->GetSpellCharges()));       // Spell charges
 
         uint8 enchCount = 0;
-        size_t enchCountPos = data.wpos();
+        size_t enchCountPos = data.WritePos();
 
         data << uint8(enchCount);                           // Number of enchantments
         for (uint32 i = PERM_ENCHANTMENT_SLOT; i < MAX_ENCHANTMENT_SLOT; ++i)
@@ -2759,7 +2759,7 @@ void Guild::_SendBankContentUpdate(uint8 tabId, SlotIds slots) const
         data << uint64(m_bankMoney);
         data << uint8(tabId);
 
-        size_t rempos = data.wpos();
+        size_t rempos = data.WritePos();
         data << uint32(0);                                      // Item withdraw amount, will be filled later
         data << uint8(0);                                       // Tell client that there's no tab info in this packet
 

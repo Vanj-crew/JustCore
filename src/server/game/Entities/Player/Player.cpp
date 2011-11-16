@@ -1126,7 +1126,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo, uint32 acco
         SetPower(POWER_MANA, 0);
         SetMaxPower(POWER_MANA, 0);
     }
-	
+
     // original spells
     learnDefaultSpells();
 
@@ -3498,7 +3498,7 @@ void Player::SendInitialSpells()
     WorldPacket data(SMSG_INITIAL_SPELLS, (1+2+4*m_spells.size()+2+m_spellCooldowns.size()*(2+2+2+4+4)));
     data << uint8(0);
 
-    size_t countPos = data.wpos();
+    size_t countPos = data.WritePos();
     data << uint16(spellCount);                             // spell count placeholder
 
     for (PlayerSpellMap::const_iterator itr = m_spells.begin(); itr != m_spells.end(); ++itr)
@@ -10699,10 +10699,10 @@ InventoryResult Player::CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemP
     if (need_space > count)
         need_space = count;
 
-    ItemPosCount newPosition = ItemPosCount((bag << 8) | slot, need_space);
-    if (!newPosition.isContainedIn(dest))
+    ItemPosCount neWritePosition = ItemPosCount((bag << 8) | slot, need_space);
+    if (!neWritePosition.isContainedIn(dest))
     {
-        dest.push_back(newPosition);
+        dest.push_back(neWritePosition);
         count -= need_space;
     }
     return EQUIP_ERR_OK;
@@ -10765,10 +10765,10 @@ InventoryResult Player::CanStoreItem_InBag(uint8 bag, ItemPosCountVec &dest, Ite
         if (need_space > count)
             need_space = count;
 
-        ItemPosCount newPosition = ItemPosCount((bag << 8) | j, need_space);
-        if (!newPosition.isContainedIn(dest))
+        ItemPosCount neWritePosition = ItemPosCount((bag << 8) | j, need_space);
+        if (!neWritePosition.isContainedIn(dest))
         {
-            dest.push_back(newPosition);
+            dest.push_back(neWritePosition);
             count -= need_space;
 
             if (count==0)
@@ -10816,10 +10816,10 @@ InventoryResult Player::CanStoreItem_InInventorySlots(uint8 slot_begin, uint8 sl
         if (need_space > count)
             need_space = count;
 
-        ItemPosCount newPosition = ItemPosCount((INVENTORY_SLOT_BAG_0 << 8) | j, need_space);
-        if (!newPosition.isContainedIn(dest))
+        ItemPosCount neWritePosition = ItemPosCount((INVENTORY_SLOT_BAG_0 << 8) | j, need_space);
+        if (!neWritePosition.isContainedIn(dest))
         {
-            dest.push_back(newPosition);
+            dest.push_back(neWritePosition);
             count -= need_space;
 
             if (count==0)
@@ -18513,7 +18513,7 @@ void Player::SendRaidInfo()
 
     WorldPacket data(SMSG_RAID_INSTANCE_INFO, 4);
 
-    size_t p_counter = data.wpos();
+    size_t p_counter = data.WritePos();
     data << uint32(counter);                                // placeholder
 
     time_t now = time(NULL);
@@ -18560,7 +18560,7 @@ void Player::SendSavedInstances()
     }
 
     //Send opcode 811. true or false means, whether you have current raid/heroic instances
-    data.Initialize(SMSG_UPDATE_INSTANCE_OWNERSHIP);
+    data.Initialize(SMSG_UPDATE_INSTANCE_OWNERSHIP, 4);
     data << uint32(hasBeenSaved);
     GetSession()->SendPacket(&data);
 
@@ -18573,7 +18573,7 @@ void Player::SendSavedInstances()
         {
             if (itr->second.perm)
             {
-                data.Initialize(SMSG_UPDATE_LAST_INSTANCE);
+                data.Initialize(SMSG_UPDATE_LAST_INSTANCE, 4);
                 data << uint32(itr->second.save->GetMapId());
                 GetSession()->SendPacket(&data);
             }
@@ -19932,7 +19932,7 @@ void Player::PetSpellInitialize()
     // action bar loop
     charmInfo->BuildActionBar(&data);
 
-    size_t spellsCountPos = data.wpos();
+    size_t spellsCountPos = data.WritePos();
 
     // spells count
     uint8 addlist = 0;
@@ -20174,7 +20174,7 @@ void Player::AddSpellMod(SpellModifier* mod, bool apply)
 
     WorldPacket data(Opcode);
     data << uint32(1); //number of spell mod to add
-    size_t wpos_count2 = data.wpos();
+    size_t WritePos_count2 = data.WritePos();
     uint32 count2 = 0;
     data << uint32(count2);
     data << uint8(mod->op);
@@ -20204,7 +20204,7 @@ void Player::AddSpellMod(SpellModifier* mod, bool apply)
             count2++;
         }
     }
-    data.put(wpos_count2, count2);
+    data.put(WritePos_count2, count2);
 
     SendDirectMessage(&data);
 
@@ -24501,7 +24501,7 @@ void Player::BuildPlayerTalentsInfoData(WorldPacket *data)
         {
             uint8 talentIdCount = 0;
             *data << uint32(TalentBranchSpec(specIdx));  //branchSpec
-            size_t pos = data->wpos();
+            size_t pos = data->WritePos();
             *data << uint8(talentIdCount);                  // [PH], talentIdCount
 
             // find class talent tabs (all players have 3 talent tabs)
@@ -24556,11 +24556,11 @@ void Player::BuildPlayerTalentsInfoData(WorldPacket *data)
 void Player::BuildPetTalentsInfoData(WorldPacket *data)
 {
     uint32 unspentTalentPoints = 0;
-    size_t pointsPos = data->wpos();
+    size_t pointsPos = data->WritePos();
     *data << uint32(unspentTalentPoints);                   // [PH], unspentTalentPoints
 
     uint8 talentIdCount = 0;
-    size_t countPos = data->wpos();
+    size_t countPos = data->WritePos();
     *data << uint8(talentIdCount);                          // [PH], talentIdCount
 
     Pet* pet = GetPet();
@@ -24639,7 +24639,7 @@ void Player::SendTalentsInfoData(bool pet)
 void Player::BuildEnchantmentsInfoData(WorldPacket *data)
 {
     uint32 slotUsedMask = 0;
-    size_t slotUsedMaskPos = data->wpos();
+    size_t slotUsedMaskPos = data->WritePos();
     *data << uint32(slotUsedMask);                          // slotUsedMask < 0x80000
 
     for (uint32 i = 0; i < EQUIPMENT_SLOT_END; ++i)
@@ -24654,7 +24654,7 @@ void Player::BuildEnchantmentsInfoData(WorldPacket *data)
         *data << uint32(item->GetEntry());                  // item entry
 
         uint16 enchantmentMask = 0;
-        size_t enchantmentMaskPos = data->wpos();
+        size_t enchantmentMaskPos = data->WritePos();
         *data << uint16(enchantmentMask);                   // enchantmentMask < 0x1000
 
         for (uint32 j = 0; j < MAX_ENCHANTMENT_SLOT; ++j)
@@ -24683,7 +24683,7 @@ void Player::SendEquipmentSetList()
 {
     uint32 count = 0;
     WorldPacket data(SMSG_EQUIPMENT_SET_LIST, 4);
-    size_t count_pos = data.wpos();
+    size_t count_pos = data.WritePos();
     data << uint32(count);                                  // count placeholder
     for (EquipmentSets::iterator itr = m_EquipmentSets.begin(); itr != m_EquipmentSets.end(); ++itr)
     {

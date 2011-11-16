@@ -23,15 +23,14 @@
 #define _BYTEBUFFER_H
 
 #include "Common.h"
-#include "Debugging/Errors.h"
-#include "Logging/Log.h"
-#include "Utilities/ByteConverter.h"
+#include "Log.h"
+#include "ByteConverter.h"
 
 class ByteBufferException
 {
     public:
-        ByteBufferException(bool _add, size_t _pos, size_t _esize, size_t _size)
-            : add(_add), pos(_pos), esize(_esize), size(_size)
+        ByteBufferException(bool add, size_t pos, size_t elementSize, size_t totalSize)
+            : _add(add), _pos(pos), _elementSize(elementSize), _totalSize(totalSize)
         {
             PrintPosError();
         }
@@ -39,71 +38,168 @@ class ByteBufferException
         void PrintPosError() const
         {
             sLog->outError("Attempted to %s in ByteBuffer (pos: " SIZEFMTD " size: "SIZEFMTD") value with size: " SIZEFMTD,
-                (add ? "put" : "get"), pos, size, esize);
+                (_add ? "put" : "get"), _pos, _totalSize, _elementSize);
         }
     private:
-        bool add;
-        size_t pos;
-        size_t esize;
-        size_t size;
+        bool _add;
+        size_t _pos;
+        size_t _totalSize;
+        size_t _elementSize;
 };
 
 class ByteBuffer
 {
     public:
-        const static size_t DEFAULT_SIZE = 0x1000;
-
-        // constructor
-        ByteBuffer(): _rpos(0), _wpos(0), _bitpos(8), _curbitval(0)
+        ByteBuffer() : rpos(0), wpos(0), bitpos(8), curbitval(0)
         {
-            _storage.reserve(DEFAULT_SIZE);
+            _newAllocation(NULL, 10, true);
         }
 
-        // constructor
-        ByteBuffer(size_t res): _rpos(0), _wpos(0), _bitpos(8), _curbitval(0)
+        ByteBuffer(size_t reserved) : rpos(0), wpos(0), bitpos(8), curbitval(0)
         {
-            _storage.reserve(res);
+            _newAllocation(NULL, reserved, true);
         }
 
-        // copy constructor
-        ByteBuffer(const ByteBuffer &buf): _rpos(buf._rpos), _wpos(buf._wpos), _storage(buf._storage), _bitpos(buf._bitpos), _curbitval(buf._curbitval) { }
-
-        void clear()
+        ByteBuffer(const ByteBuffer &buffer) : rpos(buffer.rpos), wpos(buffer.rpos), bitpos(buffer.bitpos),
+            curbitval(buffer.curbitval)
         {
-            _storage.clear();
-            _rpos = _wpos = 0;
-            _bitpos = 8;
-            _curbitval = 0;
+            _newAllocation(NULL, buffer.length, true);
+            memcpy(data, buffer.data, length);
         }
 
-        template <typename T> void append(T value)
+        ~ByteBuffer()
         {
+            free(data);
+        }
+
+        size_t size() const { return length; }
+        size_t WritePos() const { return wpos; }
+        size_t ReadPos() const { return rpos; }
+        void* contents() const { return data; }
+
+        void clear(size_t size = 10)
+        {
+            rpos = 0;
+            wpos = 0;
+            bitpos = 8;
+            curbitval = 0;
+            length = size;
+            data = realloc(data, size);
+            memset(data, '\0', size);
+        }
+
+        bool empty()
+        {
+            if (wpos > 0)
+                return false;
+            else
+                return true;
+        }
+
+        void deAllocateLeftover()
+        {
+            data = realloc(data, wpos);
+            length = wpos;
+        }
+
+        template <typename T> void append(T value, size_t size = 0)
+        {
+            if (!size)
+                size = sizeof(value);
+
             flushBits();
             EndianConvert(value);
-            append((uint8 *)&value, sizeof(value));
+
+            if (length < wpos + size)
+                _newAllocation(data, length + size, false);
+
+            memcpy((char*)data + wpos, &value, size);
+            wpos += size;
+        }
+
+        void append(uint8 *value, size_t len)
+        {
+            if (length < wpos + len)
+                _newAllocation(data, length + len, false);
+
+            memcpy((char*)data + wpos, value, len);
+            wpos += len;
+        }
+
+        void append(ByteBuffer& buffer)
+        {
+            buffer.deAllocateLeftover();
+            size_t len = buffer.length;
+
+            if (length < wpos + len)
+                _newAllocation(data, wpos + len, false);
+
+            memcpy((char*)data + wpos, buffer.contents(), len);
+            wpos += len;
+        }
+
+        template <typename T> T read()
+        {
+            T temp;
+            size_t size = sizeof(T);
+
+            if (size > length - rpos)
+                throw ByteBufferException(false, rpos, size, length);
+
+            memcpy(&temp, (char*)data + rpos, size);
+            rpos += size;
+            EndianConvert(temp);
+            return temp;
+        }
+
+        template <typename T> void put(size_t pos, T value)
+        {
+            EndianConvert(value);
+            memcpy((char*)data + pos, &value, sizeof(value)); // Data must be written before using this to replace data
+        }
+
+        template <typename T> T read(size_t pos) const
+        {
+            size_t size = sizeof(T);
+            if (pos + size > length)
+                throw ByteBufferException(false, pos, sizeof(T), length);
+
+            T val;
+            memcpy(&val, (char*)data + pos, size);
+            EndianConvert(val);
+            return val;
+        }
+
+        void read(uint8 *dest, size_t len)
+        {
+            if (rpos + len > length)
+                throw ByteBufferException(false, rpos, len, length);
+
+            memcpy(dest, (char*)data + rpos, len);
+            rpos += len;
         }
 
         void flushBits()
         {
-            if (_bitpos == 8)
+            if (bitpos == 8)
                 return;
 
-            append((uint8 *)&_curbitval, sizeof(uint8));
-            _curbitval = 0;
-            _bitpos = 8;
+            bitpos = 8;
+            append<uint8>(curbitval);
+            curbitval = 0;
         }
 
         bool writeBit(uint32 bit)
         {
-            --_bitpos;
+            --bitpos;
             if (bit)
-                _curbitval |= (1 << (_bitpos));
+                curbitval |= (1 << (bitpos));
 
-            if (_bitpos == 0)
+            if (bitpos == 0)
             {
-                _bitpos = 8;
-                append((uint8 *)&_curbitval, sizeof(_curbitval));
-                _curbitval = 0;
+                bitpos = 8;
+                append<uint8>(curbitval);
+                curbitval = 0;
             }
 
             return (bit != 0);
@@ -111,26 +207,26 @@ class ByteBuffer
 
         bool readBit()
         {
-            ++_bitpos;
-            if (_bitpos > 7)
+            ++bitpos;
+            if (bitpos > 7)
             {
-                _bitpos = 0;
-                _curbitval = read<uint8>();
+                bitpos = 0;
+                curbitval = read<uint8>();
             }
-            bool bit = ((_curbitval >> (7-_bitpos)) & 1) != 0;
+            bool bit = ((curbitval >> (7 - bitpos)) & 1) != 0;
             return bit;
         }
 
         template <typename T> void writeBits(T value, size_t bits)
         {
-            for (int32 i = bits-1; i >= 0; --i)
+            for (int32 i = bits - 1; i >= 0; --i)
                 writeBit((value >> i) & 1);
         }
 
         uint32 readBits(size_t bits)
         {
             uint32 value = 0;
-            for (int32 i = bits-1; i >= 0; --i)
+            for (int32 i = bits - 1; i >= 0; --i)
             {
                 if (readBit())
                 {
@@ -140,10 +236,26 @@ class ByteBuffer
             return value;
         }
 
-        template <typename T> void put(size_t pos, T value)
+        void ReadByteMask(uint8& b)
         {
-            EndianConvert(value);
-            put(pos, (uint8 *)&value, sizeof(value));
+            b = readBit() ? 1 : 0;
+        }
+
+        void ReadByteSeq(uint8& b)
+        {
+            if (b != 0)
+                b ^= read<uint8>();
+        }
+
+        void WriteByteMask(uint8 b)
+        {
+            writeBit(b);
+        }
+
+        void WriteByteSeq(uint8 b)
+        {
+            if (b != 0)
+                append<uint8>(b ^ 1);
         }
 
         ByteBuffer &operator<<(uint8 value)
@@ -170,7 +282,6 @@ class ByteBuffer
             return *this;
         }
 
-        // signed as in 2e complement
         ByteBuffer &operator<<(int8 value)
         {
             append<int8>(value);
@@ -195,7 +306,6 @@ class ByteBuffer
             return *this;
         }
 
-        // floating points
         ByteBuffer &operator<<(float value)
         {
             append<float>(value);
@@ -210,15 +320,25 @@ class ByteBuffer
 
         ByteBuffer &operator<<(const std::string &value)
         {
-            append((uint8 const *)value.c_str(), value.length());
-            append((uint8)0);
+            size_t elements = value.size() + 1; // null character must be counted too
+
+            if (wpos + elements > length)
+                _newAllocation(data, wpos + elements, false);
+
+            memcpy((char*)data + wpos, value.c_str(), elements);
+            wpos += elements;
             return *this;
         }
 
         ByteBuffer &operator<<(const char *str)
         {
-            append((uint8 const *)str, str ? strlen(str) : 0);
-            append((uint8)0);
+            size_t elements = strlen(str) + 1;
+
+            if (wpos + elements > length)
+                _newAllocation(data, wpos + elements, false);
+
+            memcpy((char*)data + wpos, str, str ? elements : 0);
+            wpos += elements;
             return *this;
         }
 
@@ -252,7 +372,6 @@ class ByteBuffer
             return *this;
         }
 
-        //signed as in 2e complement
         ByteBuffer &operator>>(int8 &value)
         {
             value = read<int8>();
@@ -292,11 +411,13 @@ class ByteBuffer
         ByteBuffer &operator>>(std::string& value)
         {
             value.clear();
-            while (rpos() < size())                         // prevent crash at wrong string format in packet
+            while (ReadPos() < size())
             {
                 char c = read<char>();
+
                 if (c == 0)
                     break;
+
                 value += c;
             }
             return *this;
@@ -304,68 +425,31 @@ class ByteBuffer
 
         uint8 operator[](size_t pos) const
         {
-            return read<uint8>(pos);
+            if (pos > length)
+                throw ByteBufferException(false, pos, sizeof(uint8), length);
+
+            uint8 value;
+            memcpy(&value, (char*)data + pos, 1);
+            EndianConvert(value);
+            return value;
         }
 
-        size_t rpos() const { return _rpos; }
+        void rfinish() { rpos = wpos; }
 
-        size_t rpos(size_t rpos_)
-        {
-            _rpos = rpos_;
-            return _rpos;
-        }
-
-        void rfinish()
-        {
-            _rpos = wpos();
-        }
-
-        size_t wpos() const { return _wpos; }
-
-        size_t wpos(size_t wpos_)
-        {
-            _wpos = wpos_;
-            return _wpos;
-        }
-
-        template<typename T>
-        void read_skip() { read_skip(sizeof(T)); }
+        template<typename T> void read_skip() { read_skip(sizeof(T)); }
 
         void read_skip(size_t skip)
         {
-            if (_rpos + skip > size())
-                throw ByteBufferException(false, _rpos, skip, size());
-            _rpos += skip;
-        }
+            if(rpos + skip > size())
+                throw ByteBufferException(false, rpos, skip, length);
 
-        template <typename T> T read()
-        {
-            T r = read<T>(_rpos);
-            _rpos += sizeof(T);
-            return r;
-        }
-
-        template <typename T> T read(size_t pos) const
-        {
-            if (pos + sizeof(T) > size())
-                throw ByteBufferException(false, pos, sizeof(T), size());
-            T val = *((T const*)&_storage[pos]);
-            EndianConvert(val);
-            return val;
-        }
-
-        void read(uint8 *dest, size_t len)
-        {
-            if (_rpos  + len > size())
-               throw ByteBufferException(false, _rpos, len, size());
-            memcpy(dest, &_storage[_rpos], len);
-            _rpos += len;
+            rpos += skip;
         }
 
         void readPackGUID(uint64& guid)
         {
-            if (rpos() + 1 > size())
-                throw ByteBufferException(false, _rpos, 1, size());
+            if(rpos + 1 > size())
+                throw ByteBufferException(false, rpos, 1, length);
 
             guid = 0;
 
@@ -376,8 +460,8 @@ class ByteBuffer
             {
                 if (guidmark & (uint8(1) << i))
                 {
-                    if (rpos() + 1 > size())
-                        throw ByteBufferException(false, _rpos, 1, size());
+                    if (rpos + 1 > size())
+                        throw ByteBufferException(false, rpos, 1, length);
 
                     uint8 bit;
                     (*this) >> bit;
@@ -386,59 +470,6 @@ class ByteBuffer
             }
         }
 
-        const uint8 *contents() const { return &_storage[0]; }
-
-        size_t size() const { return _storage.size(); }
-        bool empty() const { return _storage.empty(); }
-
-        void resize(size_t newsize)
-        {
-            _storage.resize(newsize);
-            _rpos = 0;
-            _wpos = size();
-        }
-
-        void reserve(size_t ressize)
-        {
-            if (ressize > size())
-                _storage.reserve(ressize);
-        }
-
-        void append(const std::string& str)
-        {
-            append((uint8 const*)str.c_str(), str.size() + 1);
-        }
-
-        void append(const char *src, size_t cnt)
-        {
-            return append((const uint8 *)src, cnt);
-        }
-
-        template<class T> void append(const T *src, size_t cnt)
-        {
-            return append((const uint8 *)src, cnt * sizeof(T));
-        }
-
-        void append(const uint8 *src, size_t cnt)
-        {
-            if (!cnt)
-                return;
-
-            ASSERT(size() < 10000000);
-
-            if (_storage.size() < _wpos + cnt)
-                _storage.resize(_wpos + cnt);
-            memcpy(&_storage[_wpos], src, cnt);
-            _wpos += cnt;
-        }
-
-        void append(const ByteBuffer& buffer)
-        {
-            if (buffer.wpos())
-                append(buffer.contents(), buffer.wpos());
-        }
-
-        // can be used in SMSG_MONSTER_MOVE opcode
         void appendPackXYZ(float x, float y, float z)
         {
             uint32 packed = 0;
@@ -464,58 +495,55 @@ class ByteBuffer
 
                 guid >>= 8;
             }
-            append(packGUID, size);
-        }
 
-        void put(size_t pos, const uint8 *src, size_t cnt)
-        {
-            if (pos + cnt > size())
-               throw ByteBufferException(true, pos, cnt, size());
-            memcpy(&_storage[pos], src, cnt);
+            append(&packGUID, size);
+            deAllocateLeftover();
         }
 
         void print_storage() const
         {
-            if (!sLog->IsOutDebug())                          // optimize disabled debug output
+            if(!sLog->IsOutDebug()) // optimize disabled debug output
                 return;
 
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)size() );
+            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)size());
+
             for (uint32 i = 0; i < size(); ++i)
-                sLog->outDebugInLine("%u - ", read<uint8>(i) );
+                sLog->outDebugInLine("%u - ", read<uint8>(i));
+
             sLog->outDebug(LOG_FILTER_NETWORKIO, " ");
         }
 
         void textlike() const
         {
-            if (!sLog->IsOutDebug())                          // optimize disabled debug output
+            if(!sLog->IsOutDebug()) // optimize disabled debug output
                 return;
 
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)size() );
+            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)size());
+
             for (uint32 i = 0; i < size(); ++i)
-                sLog->outDebugInLine("%c", read<uint8>(i) );
+                sLog->outDebugInLine("%c", read<uint8>(i));
+
             sLog->outDebug(LOG_FILTER_NETWORKIO, " ");
         }
 
         void hexlike() const
         {
-            if (!sLog->IsOutDebug())                          // optimize disabled debug output
+            if(!sLog->IsOutDebug()) // optimize disabled debug output
                 return;
 
             uint32 j = 1, k = 1;
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)size() );
+            sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE_SIZE: %lu", (unsigned long)length);
 
-            for (uint32 i = 0; i < size(); ++i)
+            for (uint32 i = 0; i < length; ++i)
             {
                 if ((i == (j * 8)) && ((i != (k * 16))))
                 {
                     if (read<uint8>(i) < 0x10)
-                    {
                         sLog->outDebugInLine("| 0%X ", read<uint8>(i) );
-                    }
+
                     else
-                    {
                         sLog->outDebugInLine("| %X ", read<uint8>(i) );
-                    }
+
                     ++j;
                 }
                 else if (i == (k * 16))
@@ -523,13 +551,11 @@ class ByteBuffer
                     if (read<uint8>(i) < 0x10)
                     {
                         sLog->outDebugInLine("\n");
-
                         sLog->outDebugInLine("0%X ", read<uint8>(i) );
                     }
                     else
                     {
                         sLog->outDebugInLine("\n");
-
                         sLog->outDebugInLine("%X ", read<uint8>(i) );
                     }
 
@@ -539,127 +565,44 @@ class ByteBuffer
                 else
                 {
                     if (read<uint8>(i) < 0x10)
-                    {
                         sLog->outDebugInLine("0%X ", read<uint8>(i) );
-                    }
+
                     else
-                    {
                         sLog->outDebugInLine("%X ", read<uint8>(i) );
-                    }
                 }
             }
             sLog->outDebugInLine("\n");
         }
 
     protected:
-        size_t _rpos, _wpos, _bitpos;
-        uint8 _curbitval;
-        std::vector<uint8> _storage;
+        size_t rpos;
+        size_t wpos;     // Free index
+        size_t bitpos;
+        uint8 curbitval;
+        void *data;
+        size_t length;
+
+    private:
+        void _newAllocation(void *ptr, size_t newSize, bool firstAllocation)
+        {
+            if (firstAllocation)
+            {
+                if (ptr)
+                    free(ptr);
+
+                data = malloc(newSize);
+                ASSERT(data);
+                length = newSize;
+                return;
+            }
+
+            if (!ptr || newSize < length)
+                return;
+
+            newSize += 10; // Allocate another 10 bytes to decrease reallocation amount
+            data = realloc(ptr, newSize);
+            length = newSize;
+        }
 };
 
-template <typename T>
-inline ByteBuffer &operator<<(ByteBuffer &b, std::vector<T> v)
-{
-    b << (uint32)v.size();
-    for (typename std::vector<T>::iterator i = v.begin(); i != v.end(); ++i)
-    {
-        b << *i;
-    }
-    return b;
-}
-
-template <typename T>
-inline ByteBuffer &operator>>(ByteBuffer &b, std::vector<T> &v)
-{
-    uint32 vsize;
-    b >> vsize;
-    v.clear();
-    while (vsize--)
-    {
-        T t;
-        b >> t;
-        v.push_back(t);
-    }
-    return b;
-}
-
-template <typename T>
-inline ByteBuffer &operator<<(ByteBuffer &b, std::list<T> v)
-{
-    b << (uint32)v.size();
-    for (typename std::list<T>::iterator i = v.begin(); i != v.end(); ++i)
-    {
-        b << *i;
-    }
-    return b;
-}
-
-template <typename T>
-inline ByteBuffer &operator>>(ByteBuffer &b, std::list<T> &v)
-{
-    uint32 vsize;
-    b >> vsize;
-    v.clear();
-    while (vsize--)
-    {
-        T t;
-        b >> t;
-        v.push_back(t);
-    }
-    return b;
-}
-
-template <typename K, typename V>
-inline ByteBuffer &operator<<(ByteBuffer &b, std::map<K, V> &m)
-{
-    b << (uint32)m.size();
-    for (typename std::map<K, V>::iterator i = m.begin(); i != m.end(); ++i)
-    {
-        b << i->first << i->second;
-    }
-    return b;
-}
-
-template <typename K, typename V>
-inline ByteBuffer &operator>>(ByteBuffer &b, std::map<K, V> &m)
-{
-    uint32 msize;
-    b >> msize;
-    m.clear();
-    while (msize--)
-    {
-        K k;
-        V v;
-        b >> k >> v;
-        m.insert(make_pair(k, v));
-    }
-    return b;
-}
-
-// TODO: Make a ByteBuffer.cpp and move all this inlining to it.
-template<> inline std::string ByteBuffer::read<std::string>()
-{
-    std::string tmp;
-    *this >> tmp;
-    return tmp;
-}
-
-template<>
-inline void ByteBuffer::read_skip<char*>()
-{
-    std::string temp;
-    *this >> temp;
-}
-
-template<>
-inline void ByteBuffer::read_skip<char const*>()
-{
-    read_skip<char*>();
-}
-
-template<>
-inline void ByteBuffer::read_skip<std::string>()
-{
-    read_skip<char*>();
-}
 #endif
